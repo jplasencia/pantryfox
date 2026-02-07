@@ -138,3 +138,4 @@ https://nmomkpwelcposjhdurby.supabase.co/functions/v1/pantry-fox-auth/token
 - Check browser console for errors
 - Verify Supabase Edge Function is deployed and accessible
 - Check that API_BASE_URL in index.html is correct
+# pantryfox
