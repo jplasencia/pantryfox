@@ -62,7 +62,35 @@ git push -u origin main
 
 ---
 
-## Step 6: Update Alexa Developer Console
+## Features
+
+The auth page supports two linking methods:
+
+### 1. Google Sign-In (Recommended)
+- Uses Supabase Auth's built-in Google OAuth
+- No password required
+- Works with existing Google accounts
+
+### 2. Email Linking
+- Enter email address directly
+- Account must exist in Pantry Fox database
+- Simpler for users without Google accounts
+
+---
+
+## Step 6: Configure Supabase Google Provider
+
+Before using Google Sign-In, you need to enable Google OAuth in Supabase:
+
+1. Go to: https://supabase.com/dashboard/project/nmomkpwelcposjhdurby/auth/providers
+2. Enable **Google** provider
+3. Add authorized redirect URL:
+   - `https://pantryfox.io/`
+4. Click **Save**
+
+---
+
+## Step 7: Update Alexa Developer Console
 
 1. Go to: https://developer.amazon.com/alexa/console/ask
 2. Open your **Pantry Fox** skill
@@ -96,10 +124,20 @@ Once DNS has propagated (usually 5-30 minutes):
    https://pantryfox.io/?client_id=pantry-fox-alexa&response_type=code&redirect_uri=https://layla.amazon.com/api/skill/link/M30QOVU46N9ND&state=test123
    ```
 
-2. In the Alexa app:
+2. Test Google Sign-In:
+   - Click "Sign in with Google"
+   - Complete Google OAuth flow
+   - Should redirect back to Alexa successfully
+
+3. Test Email option:
+   - Enter your email address
+   - Click "Link Account"
+   - Should redirect back to Alexa successfully
+
+4. In the Alexa app:
    - Go to Your Skills → Pantry Fox
    - Click "Link Account"
-   - Enter your email
+   - Choose Google Sign-In or enter email
    - Should redirect back to Alexa successfully
 
 ---

@@ -2,6 +2,12 @@
 
 This page handles OAuth 2.0 authorization for Alexa account linking with Pantry Fox.
 
+## Features
+
+- **Google Sign-In**: Quick authentication using Supabase Auth + Google OAuth
+- **Email Linking**: Alternative method using email address directly
+- **Beautiful UI**: Modern gradient design with smooth animations
+
 ## Deployment
 
 ### 1. Create GitHub Repository
