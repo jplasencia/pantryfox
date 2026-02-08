@@ -462,7 +462,7 @@
 
   <script>
     const SUPABASE_URL = 'https://nmomkpwelcposjhdurby.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5tb21rcHdlbGNwb3NqaGR1cmJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0ODQ1OTEsImV4cCI6MjA4NjE2MDU5MX0.zPM2fYtaM8Q3wW9hJPjPPRoOaUYBKWgrhqSYfPCaM3e8';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5tb21rcHdlbGNwb3NqaGR1cmJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkxMjc3NDIsImV4cCI6MjA4NDcwMzc0Mn0.QP0x2X7bqkdZ9E-NBsE8o47TRzx3thx4v9kDT-u6uTg';
 
     const codeInput = document.getElementById('codeInput');
 
@@ -516,7 +516,7 @@
       document.getElementById('message').classList.remove('show');
 
       try {
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/validate_alexa_link_code`, {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/check_alexa_link_code`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -524,8 +524,7 @@
             'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
           },
           body: JSON.stringify({
-            p_code: code,
-            p_alexa_user_id: 'web_validation'
+            p_code: code
           })
         });
 
@@ -537,7 +536,7 @@
 
         const validation = result.data[0];
 
-        if (!validation.success) {
+        if (!validation.valid) {
           showMessage('error', 'Invalid Code', validation.message || 'This code is invalid or has expired.');
           return;
         }
