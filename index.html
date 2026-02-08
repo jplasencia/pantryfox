@@ -532,25 +532,28 @@
             return;
           }
 
-          // If we have tokens in the hash, set the session manually
+          // If we have tokens in the hash, extract email from JWT directly
           if (accessToken && refreshToken) {
-            debugLog('Setting session from hash tokens...');
+            debugLog('Found tokens in hash, extracting email from JWT...');
             try {
-              const { data, error: sessionError } = await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken,
-              });
+              // Decode JWT to get email (no Supabase API call needed)
+              const parts = accessToken.split('.');
+              if (parts.length !== 3) {
+                throw new Error('Invalid token format');
+              }
+              const payloadBase64 = parts[1];
+              // Add padding if needed for base64 decoding
+              const paddedBase64 = payloadBase64 + '='.repeat((4 - payloadBase64.length % 4) % 4);
+              const payloadJson = atob(paddedBase64);
+              const payload = JSON.parse(payloadJson);
 
-              if (sessionError) {
-                debugLog(`ERROR setting session: ${sessionError.message}`);
-                throw sessionError;
+              debugLog(`JWT payload decoded, email: ${payload.email}`);
+
+              if (!payload.email) {
+                throw new Error('No email in token payload');
               }
 
-              debugLog(`Session set successfully, user: ${data.session?.user?.email}`);
-
-              if (data.session?.user?.email) {
-                await completeLinking(data.session.user.email, finalRedirectUri, finalState);
-              }
+              await completeLinking(payload.email, finalRedirectUri, finalState);
             } catch (err) {
               debugLog(`ERROR: ${err.message}`);
               showError('Failed to complete sign-in. Please try again.');
