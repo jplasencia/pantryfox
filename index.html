@@ -352,10 +352,14 @@
       }
 
       // Complete the linking process with email
-      async function completeLinking(email) {
+      async function completeLinking(email, redirectUriOverride, stateOverride) {
         hideMessages();
         setEmailLoading(true);
         setGoogleLoading(true);
+
+        // Use provided parameters or fall back to global variables
+        const finalRedirectUri = redirectUriOverride || redirectUri;
+        const finalState = stateOverride || state;
 
         try {
           // Generate auth code
@@ -375,7 +379,7 @@
 
           if (response.ok) {
             // Successfully linked - redirect back to Alexa
-            window.location.href = `${redirectUri}?code=${encodeURIComponent(authCode)}&state=${encodeURIComponent(state)}`;
+            window.location.href = `${finalRedirectUri}?code=${encodeURIComponent(authCode)}&state=${encodeURIComponent(finalState)}`;
           } else if (response.status === 404) {
             showError('Account not found. Please make sure you have a Pantry Fox account.');
             setEmailLoading(false);
@@ -400,14 +404,14 @@
         setGoogleLoading(true);
 
         try {
+          // Store Alexa OAuth parameters in sessionStorage for retrieval after redirect
+          sessionStorage.setItem('alexa_client_id', clientId);
+          sessionStorage.setItem('alexa_redirect_uri', redirectUri);
+          sessionStorage.setItem('alexa_state', state);
+          sessionStorage.setItem('alexa_response_type', responseType);
+
           // Redirect to Google OAuth via Supabase
-          // Preserve Alexa OAuth parameters through the redirect
-          const redirectToUrl = window.location.origin + window.location.pathname +
-            '?google=1' +
-            '&client_id=' + encodeURIComponent(clientId) +
-            '&redirect_uri=' + encodeURIComponent(redirectUri) +
-            '&state=' + encodeURIComponent(state) +
-            '&response_type=' + encodeURIComponent(responseType);
+          const redirectToUrl = window.location.origin + window.location.pathname + '?google=1';
 
           const { data, error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
@@ -420,21 +424,43 @@
             throw error;
           }
 
-          // Supabase will redirect to Google, then back here with ?code=...
+          // Supabase will redirect to Google, then back here with ?google=1
         } catch (err) {
           console.error('Google sign-in error:', err);
           showError('Failed to sign in with Google. Please try again.');
           setGoogleLoading(false);
+          // Clear sessionStorage on error
+          sessionStorage.removeItem('alexa_client_id');
+          sessionStorage.removeItem('alexa_redirect_uri');
+          sessionStorage.removeItem('alexa_state');
+          sessionStorage.removeItem('alexa_response_type');
         }
       });
 
       // Check if returning from Google OAuth
       if (urlParams.get('google') === '1') {
+        // Retrieve Alexa OAuth parameters from sessionStorage
+        const savedClientId = sessionStorage.getItem('alexa_client_id');
+        const savedRedirectUri = sessionStorage.getItem('alexa_redirect_uri');
+        const savedState = sessionStorage.getItem('alexa_state');
+        const savedResponseType = sessionStorage.getItem('alexa_response_type');
+
+        if (!savedClientId || !savedRedirectUri || !savedState || !savedResponseType) {
+          showError('Invalid authorization request. Missing required parameters.');
+          setGoogleLoading(false);
+          setEmailLoading(false);
+          return;
+        }
+
+        // Update the global variables with saved values
+        const finalRedirectUri = savedRedirectUri;
+        const finalState = savedState;
+
         // Get the session after redirect
         supabase.auth.getSession().then(async ({ data: { session } }) => {
           if (session?.user?.email) {
             // User is signed in with Google, complete linking
-            await completeLinking(session.user.email);
+            await completeLinking(session.user.email, finalRedirectUri, finalState);
           } else {
             // Try to get session from URL hash (PKCE flow)
             const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -445,7 +471,7 @@
               setTimeout(async () => {
                 const { data } = await supabase.auth.getSession();
                 if (data.session?.user?.email) {
-                  await completeLinking(data.session.user.email);
+                  await completeLinking(data.session.user.email, finalRedirectUri, finalState);
                 } else {
                   showError('Failed to complete Google sign-in. Please try again.');
                   setGoogleLoading(false);
@@ -458,6 +484,12 @@
               setEmailLoading(false);
             }
           }
+        }).finally(() => {
+          // Clear sessionStorage after processing
+          sessionStorage.removeItem('alexa_client_id');
+          sessionStorage.removeItem('alexa_redirect_uri');
+          sessionStorage.removeItem('alexa_state');
+          sessionStorage.removeItem('alexa_response_type');
         });
       }
 
