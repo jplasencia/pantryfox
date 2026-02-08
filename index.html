@@ -493,114 +493,117 @@
       if (isGoogleCallback) {
         debugLog('=== GOOGLE OAUTH CALLBACK DETECTED ===');
 
-        // Retrieve Alexa OAuth parameters from sessionStorage
-        const savedClientId = sessionStorage.getItem('alexa_client_id');
-        const savedRedirectUri = sessionStorage.getItem('alexa_redirect_uri');
-        const savedState = sessionStorage.getItem('alexa_state');
-        const savedResponseType = sessionStorage.getItem('alexa_response_type');
+        // Wrap async operations in an async function
+        (async function() {
+          // Retrieve Alexa OAuth parameters from sessionStorage
+          const savedClientId = sessionStorage.getItem('alexa_client_id');
+          const savedRedirectUri = sessionStorage.getItem('alexa_redirect_uri');
+          const savedState = sessionStorage.getItem('alexa_state');
+          const savedResponseType = sessionStorage.getItem('alexa_response_type');
 
-        debugLog(`SessionStorage values: ${JSON.stringify({ savedClientId, savedRedirectUri, savedState, savedResponseType })}`);
+          debugLog(`SessionStorage values: ${JSON.stringify({ savedClientId, savedRedirectUri, savedState, savedResponseType })}`);
 
-        if (!savedClientId || !savedRedirectUri || !savedState || !savedResponseType) {
-          debugLog('ERROR: Missing sessionStorage parameters');
-          showError('Invalid authorization request. Missing required parameters.');
-          setGoogleLoading(false);
-          setEmailLoading(false);
-          return;
-        }
-
-        const finalRedirectUri = savedRedirectUri;
-        const finalState = savedState;
-
-        // Parse URL hash for tokens
-        const hash = window.location.hash.substring(1); // Remove #
-        const hashParams = new URLSearchParams(hash);
-        const accessToken = hashParams.get('access_token');
-        const refreshToken = hashParams.get('refresh_token');
-        const error = hashParams.get('error');
-        const errorDescription = hashParams.get('error_description');
-
-        debugLog(`Hash params: access_token=${!!accessToken}, refresh_token=${!!refreshToken}, error=${error}`);
-
-        if (error) {
-          debugLog(`ERROR in hash: ${error} - ${errorDescription}`);
-          showError(`Authentication error: ${errorDescription || error}`);
-          setGoogleLoading(false);
-          setEmailLoading(false);
-          return;
-        }
-
-        // If we have tokens in the hash, set the session manually
-        if (accessToken && refreshToken) {
-          debugLog('Setting session from hash tokens...');
-          try {
-            const { data, error: sessionError } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
-
-            if (sessionError) {
-              debugLog(`ERROR setting session: ${sessionError.message}`);
-              throw sessionError;
-            }
-
-            debugLog(`Session set successfully, user: ${data.session?.user?.email}`);
-
-            if (data.session?.user?.email) {
-              await completeLinking(data.session.user.email, finalRedirectUri, finalState);
-            }
-          } catch (err) {
-            debugLog(`ERROR: ${err.message}`);
-            showError('Failed to complete sign-in. Please try again.');
+          if (!savedClientId || !savedRedirectUri || !savedState || !savedResponseType) {
+            debugLog('ERROR: Missing sessionStorage parameters');
+            showError('Invalid authorization request. Missing required parameters.');
             setGoogleLoading(false);
             setEmailLoading(false);
+            return;
           }
-          return;
-        }
 
-        // Fallback: Use onAuthStateChange to detect when session is ready
-        debugLog('No tokens in hash, using onAuthStateChange listener...');
-        let completed = false;
+          const finalRedirectUri = savedRedirectUri;
+          const finalState = savedState;
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-          debugLog(`Auth state changed: ${event}, user: ${session?.user?.email}`);
+          // Parse URL hash for tokens
+          const hash = window.location.hash.substring(1); // Remove #
+          const hashParams = new URLSearchParams(hash);
+          const accessToken = hashParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token');
+          const error = hashParams.get('error');
+          const errorDescription = hashParams.get('error_description');
 
-          if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user?.email && !completed) {
+          debugLog(`Hash params: access_token=${!!accessToken}, refresh_token=${!!refreshToken}, error=${error}`);
+
+          if (error) {
+            debugLog(`ERROR in hash: ${error} - ${errorDescription}`);
+            showError(`Authentication error: ${errorDescription || error}`);
+            setGoogleLoading(false);
+            setEmailLoading(false);
+            return;
+          }
+
+          // If we have tokens in the hash, set the session manually
+          if (accessToken && refreshToken) {
+            debugLog('Setting session from hash tokens...');
+            try {
+              const { data, error: sessionError } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken,
+              });
+
+              if (sessionError) {
+                debugLog(`ERROR setting session: ${sessionError.message}`);
+                throw sessionError;
+              }
+
+              debugLog(`Session set successfully, user: ${data.session?.user?.email}`);
+
+              if (data.session?.user?.email) {
+                await completeLinking(data.session.user.email, finalRedirectUri, finalState);
+              }
+            } catch (err) {
+              debugLog(`ERROR: ${err.message}`);
+              showError('Failed to complete sign-in. Please try again.');
+              setGoogleLoading(false);
+              setEmailLoading(false);
+            }
+            return;
+          }
+
+          // Fallback: Use onAuthStateChange to detect when session is ready
+          debugLog('No tokens in hash, using onAuthStateChange listener...');
+          let completed = false;
+
+          const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            debugLog(`Auth state changed: ${event}, user: ${session?.user?.email}`);
+
+            if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user?.email && !completed) {
+              completed = true;
+              debugLog('User signed in, completing linking...');
+              // User is signed in with Google, complete linking
+              await completeLinking(session.user.email, finalRedirectUri, finalState);
+              // Unsubscribe after handling
+              subscription.unsubscribe();
+            }
+          });
+
+          // Also check current session as a fallback
+          debugLog('Checking current session...');
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user?.email && !completed) {
             completed = true;
-            debugLog('User signed in, completing linking...');
-            // User is signed in with Google, complete linking
+            debugLog(`Current session found: ${session.user.email}`);
             await completeLinking(session.user.email, finalRedirectUri, finalState);
-            // Unsubscribe after handling
             subscription.unsubscribe();
           }
-        });
 
-        // Also check current session as a fallback
-        debugLog('Checking current session...');
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user?.email && !completed) {
-          completed = true;
-          debugLog(`Current session found: ${session.user.email}`);
-          await completeLinking(session.user.email, finalRedirectUri, finalState);
-          subscription.unsubscribe();
-        }
+          // Timeout fallback: if no session after 10 seconds, show error
+          setTimeout(() => {
+            if (!completed) {
+              subscription.unsubscribe();
+              debugLog('ERROR: Sign-in timed out');
+              showError('Sign-in timed out. Please try again.');
+              setGoogleLoading(false);
+              setEmailLoading(false);
+            }
+          }, 10000);
 
-        // Timeout fallback: if no session after 10 seconds, show error
-        setTimeout(() => {
-          if (!completed) {
-            subscription.unsubscribe();
-            debugLog('ERROR: Sign-in timed out');
-            showError('Sign-in timed out. Please try again.');
-            setGoogleLoading(false);
-            setEmailLoading(false);
-          }
-        }, 10000);
-
-        // Clear sessionStorage after processing
-        sessionStorage.removeItem('alexa_client_id');
-        sessionStorage.removeItem('alexa_redirect_uri');
-        sessionStorage.removeItem('alexa_state');
-        sessionStorage.removeItem('alexa_response_type');
+          // Clear sessionStorage after processing
+          sessionStorage.removeItem('alexa_client_id');
+          sessionStorage.removeItem('alexa_redirect_uri');
+          sessionStorage.removeItem('alexa_state');
+          sessionStorage.removeItem('alexa_response_type');
+        })();
       }
 
       // Email form submit handler
