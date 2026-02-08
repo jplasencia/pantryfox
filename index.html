@@ -456,41 +456,63 @@
         const finalRedirectUri = savedRedirectUri;
         const finalState = savedState;
 
-        // Get the session after redirect
-        supabase.auth.getSession().then(async ({ data: { session } }) => {
-          if (session?.user?.email) {
+        console.log('Google OAuth callback detected, waiting for session...');
+
+        // Use onAuthStateChange to detect when session is ready
+        // This is more reliable than getSession() for PKCE flow
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+          console.log('Auth state changed:', event, session?.user?.email);
+
+          if (event === 'SIGNED_IN' && session?.user?.email) {
             // User is signed in with Google, complete linking
             await completeLinking(session.user.email, finalRedirectUri, finalState);
-          } else {
-            // Try to get session from URL hash (PKCE flow)
-            const hashParams = new URLSearchParams(window.location.hash.substring(1));
-            const accessToken = hashParams.get('access_token');
-
-            if (accessToken) {
-              // Wait a bit for session to be established
-              setTimeout(async () => {
-                const { data } = await supabase.auth.getSession();
-                if (data.session?.user?.email) {
-                  await completeLinking(data.session.user.email, finalRedirectUri, finalState);
-                } else {
-                  showError('Failed to complete Google sign-in. Please try again.');
-                  setGoogleLoading(false);
-                  setEmailLoading(false);
-                }
-              }, 500);
-            } else {
-              showError('Failed to complete Google sign-in. Please try again.');
-              setGoogleLoading(false);
-              setEmailLoading(false);
+            // Unsubscribe after handling
+            subscription.unsubscribe();
+          } else if (event === 'INITIAL_SESSION') {
+            // Check if we have a session on initial load
+            if (session?.user?.email) {
+              await completeLinking(session.user.email, finalRedirectUri, finalState);
+              subscription.unsubscribe();
             }
+            // If no session, wait for SIGNED_IN event
           }
-        }).finally(() => {
-          // Clear sessionStorage after processing
-          sessionStorage.removeItem('alexa_client_id');
-          sessionStorage.removeItem('alexa_redirect_uri');
-          sessionStorage.removeItem('alexa_state');
-          sessionStorage.removeItem('alexa_response_type');
         });
+
+        // Also check URL hash directly for tokens as a fallback
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+
+        if (accessToken) {
+          console.log('Found access_token in URL hash');
+          // The onAuthStateChange listener should handle this
+        } else {
+          console.log('No access_token in hash, checking current session...');
+          // Check if we already have a session
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session?.user?.email) {
+              completeLinking(session.user.email, finalRedirectUri, finalState);
+              subscription.unsubscribe();
+            }
+          });
+        }
+
+        // Timeout fallback: if no session after 10 seconds, show error
+        setTimeout(() => {
+          subscription.unsubscribe();
+          // Only show error if we haven't redirected yet
+          if (!window.location.href.includes('layla.amazon.com') &&
+              !window.location.href.includes('pitangui.amazon.com')) {
+            showError('Sign-in timed out. Please try again.');
+            setGoogleLoading(false);
+            setEmailLoading(false);
+          }
+        }, 10000);
+
+        // Clear sessionStorage after processing
+        sessionStorage.removeItem('alexa_client_id');
+        sessionStorage.removeItem('alexa_redirect_uri');
+        sessionStorage.removeItem('alexa_state');
+        sessionStorage.removeItem('alexa_response_type');
       }
 
       // Email form submit handler
