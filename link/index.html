@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Link Alexa - Pantry Fox</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 24px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 420px;
+      width: 100%;
+      padding: 32px;
+      animation: slideUp 0.4s ease-out;
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .logo {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .logo-icon {
+      width: 64px;
+      height: 64px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+    }
+
+    .logo-icon svg {
+      width: 36px;
+      height: 36px;
+      fill: white;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: #1a1a2e;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #6b7280;
+      text-align: center;
+      margin-bottom: 28px;
+      line-height: 1.5;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-input-wrapper {
+      display: flex;
+      gap: 4px;
+    }
+
+    .code-input {
+      flex: 1;
+      font-size: 28px;
+      font-weight: 700;
+      text-align: center;
+      letter-spacing: 4px;
+      padding: 16px 12px;
+      border: 2px solid #e5e7eb;
+      border-radius: 12px;
+      background: #f9fafb;
+      color: #1a1a2e;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+
+    .code-input:focus {
+      outline: none;
+      border-color: #667eea;
+      background: white;
+      box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+    }
+
+    .code-input.error {
+      border-color: #ef4444;
+      background: #fef2f2;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 16px;
+      font-size: 16px;
+      font-weight: 600;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid transparent;
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: none;
+    }
+
+    .btn.loading .spinner {
+      display: block;
+    }
+
+    .btn.loading .btn-text {
+      display: none;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .message {
+      padding: 16px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      display: none;
+      animation: slideDown 0.3s ease-out;
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .message.show {
+      display: block;
+    }
+
+    .message-success {
+      background: #d1fae5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+    }
+
+    .message-error {
+      background: #fef2f2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+
+    .message-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .message-text {
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .instructions {
+      background: #f3f4f6;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 24px;
+    }
+
+    .instructions-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .instructions-steps {
+      font-size: 13px;
+      color: #6b7280;
+      line-height: 1.6;
+    }
+
+    .instructions-steps ol {
+      padding-left: 20px;
+      margin-top: 8px;
+    }
+
+    .instructions-steps li {
+      margin-bottom: 4px;
+    }
+
+    .success-icon {
+      display: none;
+      text-align: center;
+    }
+
+    .success-icon.show {
+      display: block;
+    }
+
+    .checkmark {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 20px;
+    }
+
+    .checkmark-circle {
+      stroke: #059669;
+      stroke-dasharray: 166;
+      stroke-dashoffset: 166;
+      stroke-width: 2;
+      fill: none;
+      animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+    }
+
+    .checkmark-check {
+      transform-origin: 50% 50%;
+      stroke-dasharray: 48;
+      stroke-dashoffset: 48;
+      stroke: #059669;
+      stroke-width: 3;
+      fill: none;
+      animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.4s forwards;
+    }
+
+    @keyframes stroke {
+      100% {
+        stroke-dashoffset: 0;
+      }
+    }
+
+    .success-content {
+      display: none;
+      text-align: center;
+    }
+
+    .success-content.show {
+      display: block;
+    }
+
+    .voice-command {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 16px;
+      margin: 20px 0;
+    }
+
+    .voice-command-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      opacity: 0.8;
+      margin-bottom: 8px;
+    }
+
+    .voice-command-text {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .alexa-tips {
+      background: #f3f4f6;
+      border-radius: 12px;
+      padding: 16px;
+      text-align: left;
+    }
+
+    .alexa-tips-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 12px;
+    }
+
+    .alexa-tips-list {
+      font-size: 13px;
+      color: #6b7280;
+      line-height: 1.8;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .footer-text {
+      font-size: 12px;
+      color: #9ca3af;
+    }
+
+    .footer-link {
+      color: #667eea;
+      text-decoration: none;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Success Icon -->
+    <div class="success-icon" id="successIcon">
+      <svg class="checkmark" viewBox="0 0 52 52">
+        <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
+        <path class="checkmark-check" fill="none" d="m14.1 27.2 7.1 7.2 16.7-16.8"/>
+      </svg>
+    </div>
+
+    <!-- Logo -->
+    <div class="logo" id="logo">
+      <div class="logo-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <path d="M7 18c-1.1 0-1.99.9-1.99 2L5 18v3h4v-3c0-1.1-.9-2-2-2zm-2-1h4c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2h3zm15.369-7.349c-.365.055-.697.216-.874.525-.177.31-.191.68-.05.998.141.318.428.531.756.588 1.801.315 3.549.941 5.15 1.853.365-.612.523-1.37.391-2.125-.132-.754-.539-1.409-1.145-1.859-.607-.45-1.362-.66-2.118-.592-1.512.133-2.881.759-3.895 1.761.132-.754.177-1.531.132-2.265-.132-.734-.527-1.393-1.121-1.859-.594-.466-1.349-.689-2.105-.633-.756.056-1.464.33-1.959.861-.494.531-.793 1.207-.854 1.928-.061.721.088 1.448.416 2.088-.57-.612-.855-1.435-.798-2.289.057-.854.438-1.577 1.067-2.003 1.859-.213-.636-.263-1.328-.141-1.995.122-.667.421-1.257.891-1.693-.695-.265-1.466-.279-2.17-.041-.703.238-1.33.707-1.778.47-.448 1.065-.641 1.652-.543.587.099 1.122.421 1.531.929.409.508.642 1.135.668 1.788.026.653-.133 1.295-.453 1.845-.32-.475-.539-1.023-.627-1.6-.088-.577-.044-1.171.13-1.726.174-.555.47-1.034.904-1.395 1.005-.721 1.938-1.054 3.082-.981.361-.036.729.017 1.068.153.339.136.646.355.889.639.243.284.414.613.5.965.085.352.086.719.003 1.072-.083.354-.252.673-.503.927z"/>
+        </svg>
+      </div>
+      <h1>Pantry Fox</h1>
+      <p class="subtitle">Link your account to use Alexa with Pantry Fox</p>
+    </div>
+
+    <!-- Instructions -->
+    <div class="instructions" id="instructions">
+      <div class="instructions-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 16v-4"/>
+          <path d="M12 8h.01"/>
+        </svg>
+        How to get your code
+      </div>
+      <div class="instructions-steps">
+        1. Open the Pantry Fox app on your phone<br>
+        2. Go to Settings<br>
+        3. Tap "Link Alexa"<br>
+        4. Enter your code below (format: FOX-XXXX)
+      </div>
+    </div>
+
+    <!-- Message -->
+    <div class="message" id="message"></div>
+
+    <!-- Form -->
+    <div id="formArea">
+      <div class="form-group">
+        <label for="codeInput">Enter your link code</label>
+        <div class="code-input-wrapper">
+          <input
+            type="text"
+            id="codeInput"
+            class="code-input"
+            placeholder="FOX-XXXX"
+            maxlength="8"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="characters"
+          >
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="submitBtn" onclick="validateCode()">
+        <span class="btn-text">Validate Code</span>
+        <div class="spinner"></div>
+      </button>
+    </div>
+
+    <!-- Success Content -->
+    <div class="success-content" id="successContent">
+      <p style="color: #6b7280; margin-bottom: 20px;">
+        Your code is valid! Now link your account with Alexa:
+      </p>
+
+      <div class="voice-command">
+        <div class="voice-command-label">Say to Alexa</div>
+        <div class="voice-command-text">"Alexa, tell Pantry Fox my code is <span id="codeDisplay">FOX-XXXX</span>"</div>
+      </div>
+
+      <div class="alexa-tips">
+        <div class="alexa-tips-title">💡 Tips for best results:</div>
+        <div class="alexa-tips-list">
+          • Speak clearly and pause at the dash<br>
+          • Example: "my code is FOX dash 1 2 3 4"<br>
+          • Or say: "link account with code FOX dash 1 2 3 4"<br>
+          • Codes expire after 15 minutes
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p class="footer-text">
+        Need help? <a href="mailto:support@pantryfox.io" class="footer-link">Contact Support</a>
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://nmomkpwelcposjhdurby.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5tb21rcHdlbGNwb3NqaGR1cmJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0ODQ1OTEsImV4cCI6MjA4NjE2MDU5MX0.zPM2fYtaM8Q3wW9hJPjPPRoOaUYBKWgrhqSYfPCaM3e8';
+
+    const codeInput = document.getElementById('codeInput');
+
+    codeInput.addEventListener('input', function(e) {
+      let value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (value.length > 3) {
+        value = value.slice(0, 3) + '-' + value.slice(3, 7);
+      }
+      e.target.value = value;
+      e.target.classList.remove('error');
+    });
+
+    codeInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        validateCode();
+      }
+    });
+
+    function showMessage(type, title, text) {
+      const messageEl = document.getElementById('message');
+      messageEl.className = `message message-${type} show`;
+      messageEl.innerHTML = `
+        <div class="message-title">
+          ${type === 'success' ?
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>' :
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+          }
+          ${title}
+        </div>
+        <div class="message-text">${text}</div>
+      `;
+    }
+
+    function setLoading(loading) {
+      const btn = document.getElementById('submitBtn');
+      btn.classList.toggle('loading', loading);
+      btn.disabled = loading;
+    }
+
+    async function validateCode() {
+      const code = codeInput.value.trim().toUpperCase();
+
+      if (!code || code.length !== 8 || !code.startsWith('FOX-')) {
+        codeInput.classList.add('error');
+        codeInput.focus();
+        showMessage('error', 'Invalid Code', 'Please enter a valid code in the format FOX-XXXX');
+        return;
+      }
+
+      setLoading(true);
+      document.getElementById('message').classList.remove('show');
+
+      try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/validate_alexa_link_code`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({
+            p_code: code,
+            p_alexa_user_id: 'web_validation'
+          })
+        });
+
+        const result = await response.json();
+
+        if (result.error || !result.data || result.data.length === 0) {
+          throw new Error(result.error?.message || 'Invalid code');
+        }
+
+        const validation = result.data[0];
+
+        if (!validation.success) {
+          showMessage('error', 'Invalid Code', validation.message || 'This code is invalid or has expired.');
+          return;
+        }
+
+        // Success - show the linking instructions
+        showSuccessState(code);
+
+      } catch (error) {
+        console.error('Error:', error);
+        showMessage('error', 'Validation Failed', 'Unable to validate your code. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function showSuccessState(code) {
+      document.getElementById('instructions').style.display = 'none';
+      document.getElementById('formArea').style.display = 'none';
+      document.getElementById('logo').style.display = 'none';
+      document.getElementById('successIcon').classList.add('show');
+      document.getElementById('successContent').classList.add('show');
+      document.getElementById('codeDisplay').textContent = code;
+
+      document.querySelector('h1').textContent = 'Code Validated!';
+      document.querySelector('.subtitle').textContent = 'Now complete the linking with Alexa';
+    }
+  </script>
+</body>
+</html>
