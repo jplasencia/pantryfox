@@ -401,16 +401,18 @@
 
         try {
           // Redirect to Google OAuth via Supabase
+          // Preserve Alexa OAuth parameters through the redirect
+          const redirectToUrl = window.location.origin + window.location.pathname +
+            '?google=1' +
+            '&client_id=' + encodeURIComponent(clientId) +
+            '&redirect_uri=' + encodeURIComponent(redirectUri) +
+            '&state=' + encodeURIComponent(state) +
+            '&response_type=' + encodeURIComponent(responseType);
+
           const { data, error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-              redirectTo: window.location.origin + window.location.pathname + '?google=1',
-              queryParams: {
-                client_id: clientId,
-                redirect_uri: redirectUri,
-                state: state,
-                response_type: responseType
-              }
+              redirectTo: redirectToUrl
             }
           });
 
