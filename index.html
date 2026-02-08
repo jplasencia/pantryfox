@@ -231,6 +231,23 @@
     .hidden {
       display: none;
     }
+
+    .debug {
+      margin-top: 20px;
+      padding: 10px;
+      background: #f0f0f0;
+      border-radius: 8px;
+      font-size: 12px;
+      text-align: left;
+      font-family: monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .debug h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
@@ -277,6 +294,11 @@
     <div class="footer">
       By linking, you authorize Pantry Fox to access your account via Alexa.
     </div>
+
+    <div id="debug" class="debug hidden">
+      <h3>Debug Info</h3>
+      <div id="debugContent"></div>
+    </div>
   </div>
 
   <!-- Supabase JS Client -->
@@ -301,6 +323,16 @@
       const emailInput = document.getElementById('email');
       const submitBtn = document.getElementById('submitBtn');
       const googleBtn = document.getElementById('googleBtn');
+      const debugDiv = document.getElementById('debug');
+      const debugContent = document.getElementById('debugContent');
+
+      // Debug function
+      function debugLog(message) {
+        const timestamp = new Date().toLocaleTimeString();
+        debugContent.textContent += `[${timestamp}] ${message}\n`;
+        debugDiv.classList.remove('hidden');
+        console.log(`[Auth Debug] ${message}`);
+      }
 
       // Get OAuth parameters from URL
       const urlParams = new URLSearchParams(window.location.search);
@@ -308,12 +340,22 @@
       const redirectUri = urlParams.get('redirect_uri');
       const state = urlParams.get('state');
       const responseType = urlParams.get('response_type');
+      const isGoogleCallback = urlParams.get('google') === '1';
+
+      // Debug: Show current URL info
+      debugLog(`Current URL: ${window.location.href}`);
+      debugLog(`Search params: ${window.location.search}`);
+      debugLog(`Hash: ${window.location.hash}`);
+      debugLog(`Is Google callback: ${isGoogleCallback}`);
 
       // Validate required OAuth parameters
       if (!clientId || !redirectUri || !state || !responseType) {
         showError('Invalid authorization request. Missing required parameters.');
         submitBtn.disabled = true;
         googleBtn.disabled = true;
+        debugLog('ERROR: Missing OAuth parameters');
+      } else {
+        debugLog(`OAuth params OK - client_id: ${clientId}`);
       }
 
       function showError(message) {
@@ -402,6 +444,7 @@
       googleBtn.addEventListener('click', async function() {
         hideMessages();
         setGoogleLoading(true);
+        debugLog('Google Sign-In button clicked');
 
         try {
           // Store Alexa OAuth parameters in sessionStorage for retrieval after redirect
@@ -409,24 +452,33 @@
           sessionStorage.setItem('alexa_redirect_uri', redirectUri);
           sessionStorage.setItem('alexa_state', state);
           sessionStorage.setItem('alexa_response_type', responseType);
+          debugLog('Stored OAuth params in sessionStorage');
 
           // Redirect to Google OAuth via Supabase
           const redirectToUrl = window.location.origin + window.location.pathname + '?google=1';
+          debugLog(`Redirect URL for OAuth: ${redirectToUrl}`);
 
           const { data, error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-              redirectTo: redirectToUrl
+              redirectTo: redirectToUrl,
+              queryParams: {
+                access_type: 'offline',
+                prompt: 'consent',
+              }
             }
           });
 
           if (error) {
+            debugLog(`OAuth error: ${error.message}`);
             throw error;
           }
 
+          debugLog('OAuth initiated, should redirect to Google...');
           // Supabase will redirect to Google, then back here with ?google=1
         } catch (err) {
           console.error('Google sign-in error:', err);
+          debugLog(`Sign-in error: ${err.message}`);
           showError('Failed to sign in with Google. Please try again.');
           setGoogleLoading(false);
           // Clear sessionStorage on error
@@ -438,70 +490,106 @@
       });
 
       // Check if returning from Google OAuth
-      if (urlParams.get('google') === '1') {
+      if (isGoogleCallback) {
+        debugLog('=== GOOGLE OAUTH CALLBACK DETECTED ===');
+
         // Retrieve Alexa OAuth parameters from sessionStorage
         const savedClientId = sessionStorage.getItem('alexa_client_id');
         const savedRedirectUri = sessionStorage.getItem('alexa_redirect_uri');
         const savedState = sessionStorage.getItem('alexa_state');
         const savedResponseType = sessionStorage.getItem('alexa_response_type');
 
+        debugLog(`SessionStorage values: ${JSON.stringify({ savedClientId, savedRedirectUri, savedState, savedResponseType })}`);
+
         if (!savedClientId || !savedRedirectUri || !savedState || !savedResponseType) {
+          debugLog('ERROR: Missing sessionStorage parameters');
           showError('Invalid authorization request. Missing required parameters.');
           setGoogleLoading(false);
           setEmailLoading(false);
           return;
         }
 
-        // Update the global variables with saved values
         const finalRedirectUri = savedRedirectUri;
         const finalState = savedState;
 
-        console.log('Google OAuth callback detected, waiting for session...');
+        // Parse URL hash for tokens
+        const hash = window.location.hash.substring(1); // Remove #
+        const hashParams = new URLSearchParams(hash);
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        const error = hashParams.get('error');
+        const errorDescription = hashParams.get('error_description');
 
-        // Use onAuthStateChange to detect when session is ready
-        // This is more reliable than getSession() for PKCE flow
+        debugLog(`Hash params: access_token=${!!accessToken}, refresh_token=${!!refreshToken}, error=${error}`);
+
+        if (error) {
+          debugLog(`ERROR in hash: ${error} - ${errorDescription}`);
+          showError(`Authentication error: ${errorDescription || error}`);
+          setGoogleLoading(false);
+          setEmailLoading(false);
+          return;
+        }
+
+        // If we have tokens in the hash, set the session manually
+        if (accessToken && refreshToken) {
+          debugLog('Setting session from hash tokens...');
+          try {
+            const { data, error: sessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+
+            if (sessionError) {
+              debugLog(`ERROR setting session: ${sessionError.message}`);
+              throw sessionError;
+            }
+
+            debugLog(`Session set successfully, user: ${data.session?.user?.email}`);
+
+            if (data.session?.user?.email) {
+              await completeLinking(data.session.user.email, finalRedirectUri, finalState);
+            }
+          } catch (err) {
+            debugLog(`ERROR: ${err.message}`);
+            showError('Failed to complete sign-in. Please try again.');
+            setGoogleLoading(false);
+            setEmailLoading(false);
+          }
+          return;
+        }
+
+        // Fallback: Use onAuthStateChange to detect when session is ready
+        debugLog('No tokens in hash, using onAuthStateChange listener...');
+        let completed = false;
+
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-          console.log('Auth state changed:', event, session?.user?.email);
+          debugLog(`Auth state changed: ${event}, user: ${session?.user?.email}`);
 
-          if (event === 'SIGNED_IN' && session?.user?.email) {
+          if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user?.email && !completed) {
+            completed = true;
+            debugLog('User signed in, completing linking...');
             // User is signed in with Google, complete linking
             await completeLinking(session.user.email, finalRedirectUri, finalState);
             // Unsubscribe after handling
             subscription.unsubscribe();
-          } else if (event === 'INITIAL_SESSION') {
-            // Check if we have a session on initial load
-            if (session?.user?.email) {
-              await completeLinking(session.user.email, finalRedirectUri, finalState);
-              subscription.unsubscribe();
-            }
-            // If no session, wait for SIGNED_IN event
           }
         });
 
-        // Also check URL hash directly for tokens as a fallback
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        const accessToken = hashParams.get('access_token');
-
-        if (accessToken) {
-          console.log('Found access_token in URL hash');
-          // The onAuthStateChange listener should handle this
-        } else {
-          console.log('No access_token in hash, checking current session...');
-          // Check if we already have a session
-          supabase.auth.getSession().then(({ data: { session } }) => {
-            if (session?.user?.email) {
-              completeLinking(session.user.email, finalRedirectUri, finalState);
-              subscription.unsubscribe();
-            }
-          });
+        // Also check current session as a fallback
+        debugLog('Checking current session...');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.email && !completed) {
+          completed = true;
+          debugLog(`Current session found: ${session.user.email}`);
+          await completeLinking(session.user.email, finalRedirectUri, finalState);
+          subscription.unsubscribe();
         }
 
         // Timeout fallback: if no session after 10 seconds, show error
         setTimeout(() => {
-          subscription.unsubscribe();
-          // Only show error if we haven't redirected yet
-          if (!window.location.href.includes('layla.amazon.com') &&
-              !window.location.href.includes('pitangui.amazon.com')) {
+          if (!completed) {
+            subscription.unsubscribe();
+            debugLog('ERROR: Sign-in timed out');
             showError('Sign-in timed out. Please try again.');
             setGoogleLoading(false);
             setEmailLoading(false);
